@@ -1,0 +1,38 @@
+# ── .NET ──────────────────────────────────────────────────────
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+*.swp
+publish/
+
+# ── Secrets (NEVER commit these) ─────────────────────────────
+vault/vault.json
+vault/vault.entropy
+appsettings.Production.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# ── Frontend ──────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+backend/ServerCat.Api/wwwroot/
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS files ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ────────────────────────────────────────────────────
+.idea/
+.vscode/settings.json
+*.bak
+
+# ── Migrations (keep generated migrations, exclude snapshots) ─
+# backend/ServerCat.Infrastructure/Data/Migrations/
