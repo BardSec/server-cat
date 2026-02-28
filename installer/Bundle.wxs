@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ServerCat WiX v4 Bootstrapper Bundle
+  ─────────────────────────────────────
+  Wraps the ServerCat.msi and installs prerequisites automatically:
+    • .NET 8 Desktop Runtime (if not present)
+    • Visual C++ Redistributable 2022 x64 (if not present)
+
+  Build prerequisites (in addition to MSI build prereqs):
+    wix extension add WixToolset.Bal.wixext/4.0.5
+    wix extension add WixToolset.Netfx.wixext/4.0.5
+
+  Build:
+    wix build Bundle.wxs -ext WixToolset.Bal.wixext -ext WixToolset.Netfx.wixext -o ..\dist\ServerCat-Setup.exe
+
+  The resulting ServerCat-Setup.exe is a self-extracting bootstrapper that:
+    1. Checks for .NET 8 runtime — downloads and installs if missing
+    2. Runs ServerCat.msi with the GUI wizard
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx">
+
+  <Bundle
+    Name="ServerCat"
+    Manufacturer="BardSec"
+    Version="1.0.0"
+    UpgradeCode="A9B8C7D6-E5F4-3210-ABCD-EF0987654321"
+    AboutUrl="https://github.com/BardSec/server-cat"
+    IconSourceFile="Resources\servercat.ico">
+
+    <!-- Standard WiX bootstrapper UI (shows progress, prereq downloads) -->
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        Theme="hyperlinkLicense"
+        LicenseFile="Resources\LICENSE.rtf"
+        LogoFile="Resources\logo.png"
+        SuppressOptionsUI="yes" />
+    </BootstrapperApplication>
+
+    <Chain>
+
+      <!-- ── Prerequisite 1: .NET 8 ASP.NET Core Runtime ─────────
+           netfx:DotNetCoreSearch detects the installed runtime.
+           The BundlePackage downloads dotnet-hosting-8.x-win.exe
+           from Microsoft if the runtime is not already present.
+      ──────────────────────────────────────────────────────────── -->
+      <netfx:DotNetCoreSearch
+        Id="DotNet8Search"
+        RuntimeType="aspnet"
+        Platform="x64"
+        MajorVersion="8"
+        Variable="DotNet8Installed" />
+
+      <ExePackage
+        Id="DotNet8Runtime"
+        Name=".NET 8 ASP.NET Core Runtime"
+        DisplayName=".NET 8 ASP.NET Core Runtime x64"
+        Description="Required runtime for ServerCat. Will be downloaded if not present."
+        DownloadUrl="https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0/dotnet-hosting-8.0-win.exe"
+        InstallCommand="/install /quiet /norestart"
+        RepairCommand="/repair /quiet /norestart"
+        UninstallCommand="/uninstall /quiet /norestart"
+        DetectCondition="DotNet8Installed"
+        Vital="yes"
+        PerMachine="yes" />
+
+      <!-- ── Prerequisite 2: VC++ Redist 2022 x64 ────────────────
+           Required by some native components in .NET 8.
+      ──────────────────────────────────────────────────────────── -->
+      <PackageGroupRef Id="VcRedist2022x64" />
+
+      <!-- ── Main ServerCat MSI ─────────────────────────────────── -->
+      <MsiPackage
+        Id="ServerCatMsi"
+        Name="ServerCat"
+        SourceFile="..\dist\ServerCat.msi"
+        DisplayInternalUI="yes"
+        Vital="yes"
+        PerMachine="yes">
+
+        <!-- Forward wizard properties into the MSI -->
+        <MsiProperty Name="DB_HOST"          Value="[WixBundleOriginalSource]" />
+        <MsiProperty Name="DB_PASSWORD"      Value="[DB_PASSWORD]" />
+        <MsiProperty Name="SERVICE_ACCOUNT"  Value="[SERVICE_ACCOUNT]" />
+
+      </MsiPackage>
+
+    </Chain>
+
+  </Bundle>
+
+  <!-- ── VC++ Redist package group ────────────────────────────── -->
+  <Fragment>
+    <PackageGroup Id="VcRedist2022x64">
+      <ExePackage
+        Id="VcRedist2022x64Package"
+        Name="Visual C++ 2022 Redistributable (x64)"
+        DownloadUrl="https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        InstallCommand="/install /quiet /norestart"
+        RepairCommand="/repair /quiet /norestart"
+        UninstallCommand="/uninstall /quiet /norestart"
+        DetectCondition="VcRedist2022x64Installed"
+        PerMachine="yes">
+        <ExePackagePayload Name="vc_redist.x64.exe"
+                           DownloadUrl="https://aka.ms/vs/17/release/vc_redist.x64.exe" />
+      </ExePackage>
+    </PackageGroup>
+
+    <util:RegistrySearch
+      Id="VcRedistSearch"
+      Root="HKLM"
+      Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+      Value="Installed"
+      Result="value"
+      Variable="VcRedist2022x64Installed"
+      Condition="1" />
+  </Fragment>
+
+</Wix>

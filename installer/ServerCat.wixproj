@@ -1,0 +1,28 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+
+  <PropertyGroup>
+    <OutputName>ServerCat</OutputName>
+    <OutputType>Package</OutputType>
+    <!-- Set this to the published binary directory before building:
+         dotnet publish -c Release -o publish backend/ServerCat.sln
+         dotnet publish -c Release --self-contained false -o publish/api backend/ServerCat.Api/ServerCat.Api.csproj
+         Set PUBLISH_DIR to that path when building the MSI. -->
+    <PublishDir>$(MSBuildThisFileDirectory)..\publish\</PublishDir>
+    <StaticDir>$(MSBuildThisFileDirectory)..\frontend-dist\</StaticDir>
+    <Version>1.0.0</Version>
+    <Platform>x64</Platform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WiX extensions used -->
+    <PackageReference Include="WixToolset.UI.wixext"   Version="4.0.5" />
+    <PackageReference Include="WixToolset.Util.wixext"  Version="4.0.5" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="4.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Package.wxs" />
+    <Compile Include="UI\ConfigDlg.wxs" />
+  </ItemGroup>
+
+</Project>

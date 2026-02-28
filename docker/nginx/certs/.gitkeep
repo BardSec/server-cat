@@ -1,0 +1,9 @@
+# Place TLS certificate files here (not committed to git):
+#   servercat.crt  — full chain certificate
+#   servercat.key  — private key (chmod 600)
+#
+# For self-signed (dev/eval):
+#   openssl req -x509 -newkey rsa:4096 -keyout servercat.key -out servercat.crt \
+#     -days 365 -nodes -subj "/CN=servercat.local"
+#
+# For Let's Encrypt / ACME, mount the certbot live directory here instead.

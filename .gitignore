@@ -36,3 +36,17 @@ desktop.ini
 
 # ── Migrations (keep generated migrations, exclude snapshots) ─
 # backend/ServerCat.Infrastructure/Data/Migrations/
+
+# ── Installer build artifacts ─────────────────────────────────
+dist/
+publish/
+frontend-dist/
+installer/Generated*.wxs     # wix harvest output (regenerated at build time)
+installer/Resources/*.ico    # binary assets not tracked
+installer/Resources/*.rtf
+installer/Resources/*.png
+
+# ── TLS certificates (never commit) ──────────────────────────
+docker/nginx/certs/*.crt
+docker/nginx/certs/*.key
+docker/nginx/certs/*.pem

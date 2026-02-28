@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ServerCat custom installation dialog — Database & Service configuration.
+  Appears after the license agreement, before directory selection.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+    <UI>
+      <Dialog Id="ServerCatConfigDlg" Width="370" Height="270"
+              Title="[ProductName] — Database Configuration">
+
+        <!-- ── Header ─────────────────────────────────────────── -->
+        <Control Id="BannerBitmap" Type="Bitmap"
+                 X="0" Y="0" Width="370" Height="44"
+                 TabSkip="yes" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line"
+                 X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Title" Type="Text"
+                 X="15" Y="6" Width="200" Height="15"
+                 Transparent="yes" NoPrefix="yes">
+          <Text>{\WixUI_Font_Title}Database Settings</Text>
+        </Control>
+        <Control Id="Subtitle" Type="Text"
+                 X="25" Y="23" Width="340" Height="15"
+                 Transparent="yes" NoPrefix="yes">
+          <Text>Enter the PostgreSQL connection details for ServerCat.</Text>
+        </Control>
+
+        <!-- ── DB Host ─────────────────────────────────────────── -->
+        <Control Id="DbHostLabel" Type="Text"
+                 X="25" Y="58" Width="80" Height="14">
+          <Text>DB &amp;Host:</Text>
+        </Control>
+        <Control Id="DbHostEdit" Type="Edit"
+                 X="115" Y="56" Width="220" Height="17"
+                 Property="DB_HOST" Text="{80}" />
+
+        <!-- ── DB Name ─────────────────────────────────────────── -->
+        <Control Id="DbNameLabel" Type="Text"
+                 X="25" Y="80" Width="80" Height="14">
+          <Text>DB &amp;Name:</Text>
+        </Control>
+        <Control Id="DbNameEdit" Type="Edit"
+                 X="115" Y="78" Width="220" Height="17"
+                 Property="DB_NAME" Text="{80}" />
+
+        <!-- ── DB User ─────────────────────────────────────────── -->
+        <Control Id="DbUserLabel" Type="Text"
+                 X="25" Y="102" Width="80" Height="14">
+          <Text>DB &amp;Username:</Text>
+        </Control>
+        <Control Id="DbUserEdit" Type="Edit"
+                 X="115" Y="100" Width="220" Height="17"
+                 Property="DB_USER" Text="{80}" />
+
+        <!-- ── DB Password ─────────────────────────────────────── -->
+        <Control Id="DbPasswordLabel" Type="Text"
+                 X="25" Y="124" Width="80" Height="14">
+          <Text>DB &amp;Password:</Text>
+        </Control>
+        <Control Id="DbPasswordEdit" Type="Edit"
+                 X="115" Y="122" Width="220" Height="17"
+                 Property="DB_PASSWORD" Password="yes" Text="{128}" />
+
+        <!-- ── Service Account ─────────────────────────────────── -->
+        <Control Id="SvcAccountLabel" Type="Text"
+                 X="25" Y="152" Width="80" Height="14">
+          <Text>&amp;Service Account:</Text>
+        </Control>
+        <Control Id="SvcAccountEdit" Type="Edit"
+                 X="115" Y="150" Width="220" Height="17"
+                 Property="SERVICE_ACCOUNT" Text="{128}" />
+        <Control Id="SvcAccountHint" Type="Text"
+                 X="115" Y="169" Width="220" Height="20">
+          <Text>{\WixUI_Font_Smaller}Leave as "LocalSystem" for local installs. For domain accounts use DOMAIN\username.</Text>
+        </Control>
+
+        <!-- ── Divider ─────────────────────────────────────────── -->
+        <Control Id="BottomLine" Type="Line"
+                 X="0" Y="234" Width="370" Height="0" />
+
+        <!-- ── Navigation ─────────────────────────────────────── -->
+        <Control Id="Back" Type="PushButton"
+                 X="180" Y="243" Width="56" Height="17"
+                 Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton"
+                 X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Next">
+          <!-- Require a DB password before allowing Next -->
+          <Condition Action="disable">DB_PASSWORD = ""</Condition>
+          <Condition Action="enable">DB_PASSWORD &lt;&gt; ""</Condition>
+        </Control>
+        <Control Id="Cancel" Type="PushButton"
+                 X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+
+      </Dialog>
+    </UI>
+  </Fragment>
+
+</Wix>

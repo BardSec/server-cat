@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ServerCat WiX v4 MSI Package
+
+  Build prerequisites:
+    dotnet tool install -g wix
+    wix extension add WixToolset.UI.wixext/4.0.5
+    wix extension add WixToolset.Util.wixext/4.0.5
+    wix extension add WixToolset.Firewall.wixext/4.0.5
+
+  Build:
+    cd installer
+    wix build Package.wxs UI\ConfigDlg.wxs -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -ext WixToolset.Firewall.wixext -o ..\dist\ServerCat.msi
+    (or via: dotnet build ServerCat.wixproj)
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall">
+
+  <Package
+    Name="ServerCat"
+    Manufacturer="BardSec"
+    Version="1.0.0"
+    UpgradeCode="B8D4F1A2-3C7E-4F8D-9A1B-2E5C6D7F8A9B"
+    Language="1033"
+    Codepage="1252"
+    InstallerVersion="500"
+    Scope="perMachine">
+
+    <!-- Allow upgrades with the same UpgradeCode -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- ── Properties (user-configurable) ─────────────────────── -->
+    <Property Id="INSTALLDIR"         Value="C:\ServerCat" />
+    <Property Id="DB_HOST"            Value="localhost" />
+    <Property Id="DB_NAME"            Value="servercat" />
+    <Property Id="DB_USER"            Value="servercat_app" />
+    <Property Id="DB_PASSWORD"        Value="" />
+    <Property Id="JWT_SECRET"         Value="" />
+    <Property Id="SERVICE_ACCOUNT"    Value="LocalSystem" />
+    <Property Id="SERVICE_PASSWORD"   Value="" />
+
+    <!-- Auto-generate a JWT secret if not supplied -->
+    <SetProperty Id="JWT_SECRET" Before="AppSearch" Sequence="first"
+                 Value="[%RANDOM][%RANDOM][%RANDOM][%RANDOM]"
+                 Condition="JWT_SECRET = &quot;&quot;" />
+
+    <!-- ── Directory structure ────────────────────────────────── -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="ServerCat">
+        <Directory Id="VaultDir" Name="vault" />
+        <Directory Id="LogDir"   Name="logs" />
+        <Directory Id="WwwDir"   Name="wwwroot" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- ── Feature tree ──────────────────────────────────────────
+         Feature "Main" installs everything.
+         Keep it flat — single feature for simple deployments.
+    ─────────────────────────────────────────────────────────────-->
+    <Feature Id="Main" Title="ServerCat" Level="1"
+             Description="Server Catalog and Polling application (complete install)"
+             Display="expand" ConfigurableDirectory="INSTALLDIR">
+
+      <ComponentGroupRef Id="AppBinaries" />
+      <ComponentGroupRef Id="AppStaticFiles" />
+      <ComponentGroupRef Id="AppService" />
+      <ComponentGroupRef Id="AppConfig" />
+      <ComponentGroupRef Id="AppFirewall" />
+
+    </Feature>
+
+    <!-- ── Application binaries ──────────────────────────────────
+         Harvested at build time from the dotnet publish output.
+         Use 'wix harvest' (or the Wix.Harvest task in wixproj) to
+         generate a Components.wxs from the publish directory, then
+         include it here.  This placeholder installs the main EXE.
+    ─────────────────────────────────────────────────────────────-->
+    <ComponentGroup Id="AppBinaries" Directory="INSTALLDIR">
+      <Component Id="MainExe" Guid="C1A2B3D4-E5F6-7890-ABCD-EF1234567890">
+        <File Id="ServerCatExe"
+              Source="$(var.PublishDir)ServerCat.Api.exe"
+              KeyPath="yes" />
+      </Component>
+      <!-- Additional DLLs harvested by 'wix harvest' at build time.
+           See scripts/build-installer.ps1 which calls wix harvest then builds. -->
+    </ComponentGroup>
+
+    <!-- ── wwwroot static files ───────────────────────────────── -->
+    <ComponentGroup Id="AppStaticFiles" Directory="WwwDir">
+      <Component Id="StaticPlaceholder" Guid="D2B3C4E5-F6A7-8901-BCDE-F12345678901">
+        <!-- Harvested from frontend dist at build time.
+             See scripts/build-installer.ps1 for the full harvest command. -->
+        <CreateFolder />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Windows Service ────────────────────────────────────── -->
+    <ComponentGroup Id="AppService" Directory="INSTALLDIR">
+      <Component Id="ServiceConfig" Guid="E3C4D5F6-A7B8-9012-CDEF-123456789012">
+        <File Id="ServiceExe"
+              Source="$(var.PublishDir)ServerCat.Api.exe"
+              KeyPath="yes" />
+        <ServiceInstall
+          Id="ServerCatService"
+          Name="ServerCat"
+          DisplayName="ServerCat — Server Catalog &amp; Polling"
+          Description="Agentless Windows server inventory and health monitoring"
+          Type="ownProcess"
+          Start="auto"
+          ErrorControl="normal"
+          Account="[SERVICE_ACCOUNT]"
+          Password="[SERVICE_PASSWORD]" />
+        <ServiceControl
+          Id="StartService"
+          Name="ServerCat"
+          Start="install"
+          Stop="both"
+          Remove="uninstall"
+          Wait="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── App configuration (environment / registry) ────────────
+         ASP.NET Core reads config from environment variables.
+         We store them in the registry under HKLM\SYSTEM\CurrentControlSet\Services\ServerCat\Environment
+         so the Windows Service picks them up automatically.
+    ─────────────────────────────────────────────────────────────-->
+    <ComponentGroup Id="AppConfig" Directory="INSTALLDIR">
+      <Component Id="RegistryConfig" Guid="F4D5E6A7-B8C9-0123-DEFA-234567890123">
+        <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\ServerCat\Environment">
+          <RegistryValue Type="string" Name="ASPNETCORE_ENVIRONMENT"                 Value="Production" />
+          <RegistryValue Type="string" Name="ConnectionStrings__DefaultConnection"
+                         Value="Host=[DB_HOST];Database=[DB_NAME];Username=[DB_USER];Password=[DB_PASSWORD];SSL Mode=Prefer;" />
+          <RegistryValue Type="string" Name="Authentication__JwtSecret"              Value="[JWT_SECRET]" />
+          <RegistryValue Type="string" Name="Vault__VaultFilePath"
+                         Value="[INSTALLDIR]vault\vault.json" />
+          <RegistryValue Type="string" Name="Vault__EntropyFilePath"
+                         Value="[INSTALLDIR]vault\vault.entropy" />
+        </RegistryKey>
+        <CreateFolder Directory="VaultDir" />
+        <CreateFolder Directory="LogDir" />
+        <util:PermissionEx User="[SERVICE_ACCOUNT]"
+                           GenericAll="no"
+                           Read="yes" Write="yes" Execute="no"
+                           Directory="VaultDir" />
+        <KeyPath />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Firewall rules ─────────────────────────────────────── -->
+    <ComponentGroup Id="AppFirewall" Directory="INSTALLDIR">
+      <Component Id="FirewallRules" Guid="A5E6F7B8-C9D0-1234-EFAB-345678901234">
+        <!-- Inbound HTTPS for the web UI -->
+        <fw:FirewallException Id="AllowHttps" Name="ServerCat HTTPS"
+                              Port="443" Protocol="tcp" Scope="any"
+                              Profile="all" Action="allow" />
+        <!-- Outbound WinRM-HTTPS to poll targets -->
+        <fw:FirewallException Id="AllowWinRmHttps" Name="ServerCat WinRM-HTTPS outbound"
+                              Port="5986" Protocol="tcp" Scope="any"
+                              Profile="all" Action="allow" />
+        <fw:FirewallException Id="AllowWinRmHttp"  Name="ServerCat WinRM-HTTP outbound"
+                              Port="5985" Protocol="tcp" Scope="any"
+                              Profile="all" Action="allow" />
+        <CreateFolder />
+        <KeyPath />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Custom UI Sequence ─────────────────────────────────── -->
+    <UI Id="ServerCatUI">
+      <UIRef Id="WixUI_InstallDir" />
+
+      <!-- Insert custom DB config dialog between LicenseDlg and VerifyReadyDlg -->
+      <Publish Dialog="LicenseDlg"     Control="Next"    Event="NewDialog" Value="ServerCatConfigDlg" Order="3" />
+      <Publish Dialog="ServerCatConfigDlg" Control="Back" Event="NewDialog" Value="LicenseDlg" />
+      <Publish Dialog="ServerCatConfigDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+    </UI>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+    <!-- ── Validate required properties before install ─────────── -->
+    <Launch Condition="DB_PASSWORD &lt;&gt; &quot;&quot;"
+            Message="A PostgreSQL password is required. Please go back and enter the database password." />
+    <Launch Condition="Installed OR (JWT_SECRET &lt;&gt; &quot;&quot;)"
+            Message="A JWT secret could not be generated. Please try again." />
+
+  </Package>
+</Wix>

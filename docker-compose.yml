@@ -1,0 +1,60 @@
+# ServerCat — Docker Compose (development / evaluation)
+# Usage:
+#   cp .env.example .env        # edit values
+#   docker compose up -d
+#   open http://localhost:8080
+#
+# For production (adds Nginx TLS termination, restart policies, pinned secrets):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-servercat}
+      POSTGRES_USER:     ${DB_USER:-servercat_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-servercat_app} -d ${DB_NAME:-servercat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [servercat]
+
+  # ── Application ───────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: >-
+        Host=db;Database=${DB_NAME:-servercat};Username=${DB_USER:-servercat_app};
+        Password=${DB_PASSWORD};SSL Mode=Disable;
+      Authentication__JwtSecret: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      Authentication__JwtExpiryHours: ${JWT_EXPIRY_HOURS:-8}
+      Vault__VaultFilePath: /app/vault/vault.json
+      Vault__EntropyFilePath: /app/vault/vault.entropy
+      Polling__GlobalMaxConcurrency: ${POLLING_CONCURRENCY:-10}
+      Hangfire__DashboardEnabled: "true"
+      ASPNETCORE_ENVIRONMENT: ${APP_ENV:-Development}
+    volumes:
+      - vault-data:/app/vault
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks: [servercat]
+
+volumes:
+  db-data:
+  vault-data:
+
+networks:
+  servercat:
+    driver: bridge

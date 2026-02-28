@@ -1,0 +1,58 @@
+# ServerCat — Production overrides
+# Adds: Nginx TLS, restart policies, resource limits, no port exposure on app
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# TLS certificates:
+#   Place your cert and key at:
+#     ./docker/nginx/certs/servercat.crt
+#     ./docker/nginx/certs/servercat.key
+#   Or bind-mount a directory managed by certbot / ACME.
+
+services:
+
+  db:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  app:
+    restart: always
+    # Remove direct port exposure — traffic goes through Nginx
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Hangfire__DashboardEnabled: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+    networks: [servercat]
+
+  # ── Nginx TLS reverse proxy ────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks: [servercat]
+
+volumes:
+  nginx-logs:
